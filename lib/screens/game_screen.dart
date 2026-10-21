@@ -3,11 +3,14 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app_state.dart';
 import '../game/game.dart';
+import '../game/mode.dart';
 import '../game/shapes.dart';
 import '../stats.dart';
+import '../update_service.dart';
 import '../theme.dart';
 import '../widgets/board_view.dart';
 import '../widgets/buttons.dart';
@@ -23,9 +26,17 @@ class _Target {
 }
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.app, this.startNew = false});
+  const GameScreen({
+    super.key,
+    required this.app,
+    this.mode,
+    this.startNew = false,
+  });
 
   final AppState app;
+
+  /// The mode to start. When null, the saved game (and its mode) continues.
+  final GameMode? mode;
 
   /// When true a fresh game starts even if one was saved.
   final bool startNew;
@@ -41,6 +52,15 @@ class _GameScreenState extends State<GameScreen>
   static const double _trayHeight = 104;
 
   late CubooGame _game;
+  late GameMode _mode;
+
+  int _timeLeft = kTimedSeconds;
+  int _hintsLeft = 3;
+  Hint? _hint;
+  Timer? _hintTimer;
+  Timer? _ticker;
+  bool _paused = false;
+  int _shakeId = 0;
 
   final GlobalKey _boardKey = GlobalKey();
   final GlobalKey _stackKey = GlobalKey();
@@ -70,7 +90,9 @@ class _GameScreenState extends State<GameScreen>
   @override
   void initState() {
     super.initState();
+    _mode = widget.mode ?? GameMode.classic;
     _game = _loadGame();
+    _startTicker();
   }
 
   @override
@@ -86,8 +108,19 @@ class _GameScreenState extends State<GameScreen>
   @override
   void dispose() {
     _overTimer?.cancel();
+    _hintTimer?.cancel();
+    _ticker?.cancel();
     _bob.dispose();
     super.dispose();
+  }
+
+  CubooGame _newGame() {
+    _timeLeft = kTimedSeconds;
+    _hintsLeft = 3;
+    if (_mode == GameMode.daily) {
+      return CubooGame(random: math.Random(dailySeed(DateTime.now())));
+    }
+    return CubooGame();
   }
 
   CubooGame _loadGame() {
@@ -96,9 +129,20 @@ class _GameScreenState extends State<GameScreen>
       final raw = widget.app.storage.savedGame;
       if (raw != null) {
         try {
-          final game =
-              CubooGame.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-          restored = game.over ? null : game;
+          final map = jsonDecode(raw) as Map<String, dynamic>;
+          final game = CubooGame.fromJson(map);
+          if (!game.over) {
+            restored = game;
+            if (widget.mode == null) {
+              _mode = GameModeInfo.parse(map['mode']);
+            }
+            final time = map['time'];
+            if (time is int && time > 0 && time <= kTimedSeconds) {
+              _timeLeft = time;
+            }
+            final hints = map['hints'];
+            if (hints is int && hints >= 0 && hints <= 3) _hintsLeft = hints;
+          }
         } catch (_) {
           restored = null;
         }
@@ -106,12 +150,62 @@ class _GameScreenState extends State<GameScreen>
     }
     if (restored != null) return restored;
     widget.app.storage.clearGame();
-    return CubooGame();
+    return _newGame();
   }
 
   void _save() {
     if (_game.over) return;
-    widget.app.storage.saveGame(jsonEncode(_game.toJson()));
+    widget.app.storage.saveGame(
+      jsonEncode({
+        ..._game.toJson(),
+        'mode': _mode.name,
+        'time': _timeLeft,
+        'hints': _hintsLeft,
+      }),
+    );
+  }
+
+  // ---- Timer and hints ----------------------------------------------------
+
+  void _startTicker() {
+    _ticker?.cancel();
+    if (_mode != GameMode.timed) return;
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _paused || _showOver || _game.over) return;
+      if (_timeLeft <= 1) {
+        setState(() {
+          _timeLeft = 0;
+          _dragIndex = null;
+          _game.over = true;
+        });
+        _finish();
+      } else {
+        setState(() => _timeLeft--);
+      }
+    });
+  }
+
+  void _showHint() {
+    if (_hintsLeft <= 0 || _game.over || _showOver || _dragIndex != null) {
+      return;
+    }
+    final hint = _game.findHint();
+    if (hint == null) return;
+    widget.app.tapFeedback();
+    _hintTimer?.cancel();
+    setState(() {
+      _hintsLeft--;
+      _hint = hint;
+    });
+    _hintTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _hint = null);
+    });
+    _save();
+  }
+
+  void _clearHint() {
+    _hintTimer?.cancel();
+    _hint = null;
   }
 
   // ---- Dragging -----------------------------------------------------------
@@ -150,6 +244,7 @@ class _GameScreenState extends State<GameScreen>
     if (_dragIndex != null) return; // one finger at a time
     if (_game.over || _showOver || _game.tray[index] == null) return;
     widget.app.tapFeedback();
+    _clearHint();
     setState(() {
       _dragIndex = index;
       _dragPointer = pointer;
@@ -189,6 +284,8 @@ class _GameScreenState extends State<GameScreen>
       _cleared = result.cleared;
       _gainId++;
       _lastGain = result.gained;
+      _clearHint();
+      if (result.lines >= 3 || result.combo >= 4) _shakeId++;
     });
     if (result.lines > 0) {
       widget.app.clearFeedback();
@@ -200,6 +297,23 @@ class _GameScreenState extends State<GameScreen>
       combo: result.combo,
       score: _game.score,
     ));
+    if (_mode == GameMode.relaxed) {
+      widget.app.submitScore(_game.score, mode: _mode);
+      if (_game.over) {
+        _game.clearBoard();
+        setState(() {
+          _moveId++;
+          _placed = const [];
+          _cleared = const [];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No moves left. The board was cleared!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
     if (_game.over) {
       _finish();
     } else {
@@ -209,9 +323,9 @@ class _GameScreenState extends State<GameScreen>
 
   void _finish() {
     final app = widget.app;
-    _previousBest = app.best;
-    _newBest = _game.score > app.best;
-    app.submitScore(_game.score);
+    _previousBest = app.bestFor(_mode);
+    _newBest = _game.score > _previousBest;
+    app.submitScore(_game.score, mode: _mode);
     _announce(app.recordGameOver(_game.score));
     app.storage.clearGame();
     app.overFeedback();
@@ -238,6 +352,7 @@ class _GameScreenState extends State<GameScreen>
   void _undo() {
     if (!_game.undo()) return;
     widget.app.tapFeedback();
+    _clearHint();
     setState(() {
       _moveId++;
       _placed = const [];
@@ -249,8 +364,9 @@ class _GameScreenState extends State<GameScreen>
   void _restart() {
     _overTimer?.cancel();
     widget.app.storage.clearGame();
+    _clearHint();
     setState(() {
-      _game = CubooGame();
+      _game = _newGame();
       _moveId++;
       _placed = const [];
       _cleared = const [];
@@ -260,11 +376,25 @@ class _GameScreenState extends State<GameScreen>
       _showOver = false;
       _newBest = false;
     });
+    _startTicker();
     _save();
+  }
+
+  void _copyScore() {
+    final text = 'I scored ${formatScore(_game.score)} in Cuboo '
+        '(${_mode.title})! github.com/$kGithubOwner/$kGithubRepo';
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Score copied'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _pause() async {
     if (_showOver) return;
+    _paused = true;
     final c = CubooColors.of(context);
     final choice = await showDialog<String>(
       context: context,
@@ -290,8 +420,10 @@ class _GameScreenState extends State<GameScreen>
         ],
       ),
     );
+    _paused = false;
     if (!mounted) return;
     if (choice == 'home') {
+      _save();
       Navigator.of(context).pop();
     } else if (choice == 'restart') {
       _restart();
@@ -330,6 +462,10 @@ class _GameScreenState extends State<GameScreen>
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24),
                           child: GameOverCard(
+                            title: _mode == GameMode.timed
+                                ? "TIME'S UP"
+                                : 'NO MOVES LEFT',
+                            onCopy: _copyScore,
                             score: _game.score,
                             previousBest: _previousBest,
                             newBest: _newBest,
@@ -357,19 +493,45 @@ class _GameScreenState extends State<GameScreen>
             const SizedBox(height: 8),
             _header(c),
             const SizedBox(height: 16),
-            _comboChip(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_mode == GameMode.timed) ...[
+                  _timerPill(c),
+                  const SizedBox(width: 10),
+                ],
+                _comboChip(),
+              ],
+            ),
             const SizedBox(height: 16),
             _boardArea(c),
             const Spacer(),
             _tray(c),
             const SizedBox(height: 16),
-            SoftButton(
-              label: _game.undosLeft > 0
-                  ? 'Undo (${_game.undosLeft} left)'
-                  : 'Undo used',
-              icon: Icons.undo_rounded,
-              height: 52,
-              onPressed: _game.canUndo ? _undo : null,
+            Row(
+              children: [
+                Expanded(
+                  child: SoftButton(
+                    label: _game.undosLeft > 0
+                        ? 'Undo (${_game.undosLeft} left)'
+                        : 'Undo used',
+                    icon: Icons.undo_rounded,
+                    height: 52,
+                    fontSize: 15,
+                    onPressed: _game.canUndo ? _undo : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SoftButton(
+                    label: 'Hint ($_hintsLeft)',
+                    icon: Icons.lightbulb_outline_rounded,
+                    height: 52,
+                    fontSize: 15,
+                    onPressed: _hintsLeft > 0 && !_game.over ? _showHint : null,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
           ],
@@ -380,7 +542,7 @@ class _GameScreenState extends State<GameScreen>
 
   Widget _header(CubooColors c) {
     final reduce = MediaQuery.disableAnimationsOf(context);
-    final best = math.max(widget.app.best, _game.score);
+    final best = math.max(widget.app.bestFor(_mode), _game.score);
     final left = widget.app.leftHanded;
     return SizedBox(
       height: 60,
@@ -468,6 +630,35 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  Widget _timerPill(CubooColors c) {
+    final minutes = _timeLeft ~/ 60;
+    final seconds = (_timeLeft % 60).toString().padLeft(2, '0');
+    final urgent = _timeLeft <= 10;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: urgent ? kCoral : c.surface,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: SizedBox(
+        height: 36,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Center(
+            widthFactor: 1,
+            child: Text(
+              '$minutes:$seconds',
+              style: TextStyle(
+                color: urgent ? kInk : c.text,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _comboChip() {
     if (_game.combo < 2) return const SizedBox(height: 36);
     final reduce = MediaQuery.disableAnimationsOf(context);
@@ -512,6 +703,16 @@ class _GameScreenState extends State<GameScreen>
     var ghostColor = kCoral;
     final index = _dragIndex;
     final target = _target();
+    final hint = _hint;
+    if (index == null && hint != null && _game.tray[hint.index] != null) {
+      final preview = _game.preview(hint.index, hint.r, hint.c);
+      if (preview != null) {
+        ghost = preview.cells;
+        hotRows = preview.rows;
+        hotCols = preview.cols;
+        ghostColor = kBlockColors[_game.tray[hint.index]!.color];
+      }
+    }
     if (index != null && target != null) {
       final preview = _game.preview(index, target.r, target.c);
       if (preview != null) {
@@ -521,10 +722,21 @@ class _GameScreenState extends State<GameScreen>
         ghostColor = kBlockColors[_game.tray[index]!.color];
       }
     }
+    final reduce = MediaQuery.disableAnimationsOf(context);
     return SizedBox(
       width: _side,
       height: _side,
-      child: Stack(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0, end: _shakeId.toDouble()),
+        duration: reduce ? Duration.zero : const Duration(milliseconds: 380),
+        builder: (context, t, child) {
+          final f = t - t.floorToDouble();
+          return Transform.translate(
+            offset: Offset(math.sin(f * math.pi * 8) * 5 * (1 - f), 0),
+            child: child,
+          );
+        },
+        child: Stack(
         clipBehavior: Clip.none,
         children: [
           KeyedSubtree(
@@ -543,6 +755,7 @@ class _GameScreenState extends State<GameScreen>
           ),
           if (_gainId > 0) _gainPopup(),
         ],
+      ),
       ),
     );
   }

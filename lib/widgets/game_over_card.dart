@@ -12,7 +12,14 @@ class GameOverCard extends StatefulWidget {
     required this.newBest,
     required this.onPlayAgain,
     required this.onHome,
+    this.title = 'NO MOVES LEFT',
+    this.onCopy,
   });
+
+  final String title;
+
+  /// When set, a "Copy" button copies the score text.
+  final VoidCallback? onCopy;
 
   final int score;
   final int previousBest;
@@ -83,7 +90,7 @@ class _GameOverCardState extends State<GameOverCard>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'NO MOVES LEFT',
+              widget.title,
               style: TextStyle(
                 color: c.muted,
                 fontSize: 18,
@@ -189,12 +196,30 @@ class _GameOverCardState extends State<GameOverCard>
               onPressed: widget.onPlayAgain,
             ),
             const SizedBox(height: 18),
-            SoftButton(
-              label: 'Home',
-              icon: Icons.home_rounded,
-              useAlt: true,
-              fontSize: 20,
-              onPressed: widget.onHome,
+            Row(
+              children: [
+                Expanded(
+                  child: SoftButton(
+                    label: 'Home',
+                    icon: Icons.home_rounded,
+                    useAlt: true,
+                    fontSize: 18,
+                    onPressed: widget.onHome,
+                  ),
+                ),
+                if (widget.onCopy != null) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SoftButton(
+                      label: 'Copy',
+                      icon: Icons.copy_rounded,
+                      useAlt: true,
+                      fontSize: 18,
+                      onPressed: widget.onCopy,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),

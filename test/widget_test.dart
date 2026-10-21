@@ -1,5 +1,6 @@
 import 'package:cuboo/app.dart';
 import 'package:cuboo/app_state.dart';
+import 'package:cuboo/game/mode.dart';
 import 'package:cuboo/stats.dart';
 import 'package:cuboo/storage.dart';
 import 'package:cuboo/theme.dart';
@@ -117,6 +118,26 @@ void main() {
       // Put the global look back for other tests.
       again.setPalette(0);
       again.setBlockStyle(BlockStyle.flat);
+    });
+  });
+
+  group('Mode scores', () {
+    test('each mode keeps its own best score', () {
+      final storage = GameStorage.inMemory();
+      final app = AppState(storage);
+      app.submitScore(100);
+      app.submitScore(50, mode: GameMode.timed);
+      app.submitScore(70, mode: GameMode.relaxed);
+      app.submitScore(30, mode: GameMode.daily);
+      app.submitScore(20, mode: GameMode.timed); // lower, ignored
+      expect(app.bestFor(GameMode.classic), 100);
+      expect(app.bestFor(GameMode.timed), 50);
+      expect(app.bestFor(GameMode.relaxed), 70);
+      expect(app.bestFor(GameMode.daily), 30);
+
+      final again = AppState(storage);
+      expect(again.bestFor(GameMode.timed), 50);
+      expect(again.bestFor(GameMode.daily), 30);
     });
   });
 

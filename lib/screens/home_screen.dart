@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../game/mode.dart';
 import '../theme.dart';
 import '../widgets/buttons.dart';
 import '../widgets/logo.dart';
@@ -50,6 +51,87 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
     if (mounted) setState(() {});
+  }
+
+  Future<void> _startMode(GameMode mode) async {
+    if (widget.app.storage.savedGame != null) {
+      final c = CubooColors.of(context);
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: c.surface,
+          title: Text(
+            'Start a new game?',
+            style: TextStyle(color: c.text, fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            'Your game in progress will be replaced.',
+            style: TextStyle(color: c.muted),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Start'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    if (!mounted) return;
+    widget.app.tapFeedback();
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => GameScreen(app: widget.app, mode: mode, startNew: true),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
+  void _openModes() {
+    widget.app.tapFeedback();
+    final c = CubooColors.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: c.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Game modes',
+                style: TextStyle(
+                  color: c.text,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final mode in GameMode.values)
+                _ModeTile(
+                  mode: mode,
+                  best: widget.app.bestFor(mode),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _startMode(mode);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _openSettings() {
@@ -205,11 +287,26 @@ class _HomeScreenState extends State<HomeScreen>
                             ],
                           ),
                           const SizedBox(height: 16),
-                          SoftButton(
-                            label: 'Settings',
-                            icon: Icons.tune_rounded,
-                            height: 56,
-                            onPressed: _openSettings,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SoftButton(
+                                  label: 'Modes',
+                                  icon: Icons.extension_rounded,
+                                  height: 64,
+                                  onPressed: _openModes,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: SoftButton(
+                                  label: 'Settings',
+                                  icon: Icons.tune_rounded,
+                                  height: 64,
+                                  onPressed: _openSettings,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 24),
                           Text(
@@ -512,6 +609,85 @@ class _MiniBlocks extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _ModeTile extends StatelessWidget {
+  const _ModeTile({
+    required this.mode,
+    required this.best,
+    required this.onTap,
+  });
+
+  final GameMode mode;
+  final int best;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = CubooColors.of(context);
+    final radius = BorderRadius.circular(18);
+    final bestLabel = mode == GameMode.daily ? "Today's best" : 'Best';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: c.surfaceAlt,
+        borderRadius: radius,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mode.title,
+                        style: TextStyle(
+                          color: c.text,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        mode.description,
+                        style: TextStyle(
+                          color: c.muted,
+                          fontSize: 14,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      bestLabel,
+                      style: TextStyle(color: c.muted, fontSize: 12),
+                    ),
+                    Text(
+                      formatScore(best),
+                      style: TextStyle(
+                        color: c.bestText,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

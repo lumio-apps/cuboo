@@ -19,6 +19,9 @@ class GameStorage {
   static const String _kSound = 'cuboo.sound';
   static const String _kHaptics = 'cuboo.haptics';
   static const String _kGame = 'cuboo.game';
+  static const String _kBestRelaxed = 'cuboo.best.relaxed';
+  static const String _kBestTimed = 'cuboo.best.timed';
+  static const String _kDaily = 'cuboo.daily';
   static const String _kPalette = 'cuboo.palette';
   static const String _kBlockStyle = 'cuboo.blockStyle';
   static const String _kLeftHanded = 'cuboo.leftHanded';
@@ -109,4 +112,14 @@ class GameStorage {
   /// Unlocked achievement ids, joined with commas.
   String get achievementsRaw => _get<String>(_kAchievements, '');
   Future<bool> saveAchievements(String raw) => _set(_kAchievements, raw);
+
+  int get bestRelaxed => _get<int>(_kBestRelaxed, 0);
+  Future<bool> setBestRelaxed(int value) => _set(_kBestRelaxed, value);
+
+  int get bestTimed => _get<int>(_kBestTimed, 0);
+  Future<bool> setBestTimed(int value) => _set(_kBestTimed, value);
+
+  /// The best Daily Challenge score as "seed:score" ('' when none).
+  String get dailyRaw => _get<String>(_kDaily, '');
+  Future<bool> saveDaily(String raw) => _set(_kDaily, raw);
 }

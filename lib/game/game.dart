@@ -65,6 +65,15 @@ class PlaceResult {
   final int combo;
 }
 
+/// A suggested move: tray piece [index] with its top-left at ([r], [c]).
+class Hint {
+  const Hint(this.index, this.r, this.c);
+
+  final int index;
+  final int r;
+  final int c;
+}
+
 /// What would happen if a piece were dropped at a position.
 class Preview {
   const Preview({required this.cells, required this.rows, required this.cols});
@@ -314,6 +323,37 @@ class CubooGame {
       gained: gained,
       combo: combo,
     );
+  }
+
+  /// The move that clears the most lines (the first one found wins a tie),
+  /// or null when nothing fits.
+  Hint? findHint() {
+    Hint? best;
+    var bestLines = -1;
+    for (var i = 0; i < kTraySize; i++) {
+      if (tray[i] == null) continue;
+      for (var r = 0; r < kBoardSize; r++) {
+        for (var c = 0; c < kBoardSize; c++) {
+          final pre = preview(i, r, c);
+          if (pre == null) continue;
+          final lines = pre.rows.length + pre.cols.length;
+          if (lines > bestLines) {
+            bestLines = lines;
+            best = Hint(i, r, c);
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  /// Empties the board. Used by Relaxed mode when nothing fits any more.
+  void clearBoard() {
+    for (final row in board) {
+      row.fillRange(0, kBoardSize, -1);
+    }
+    _snapshot = null;
+    over = !hasMove;
   }
 
   /// Takes back the last move. Allowed once per game.

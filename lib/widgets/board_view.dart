@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../game/game.dart';
@@ -102,6 +104,26 @@ class _BoardPainter extends CustomPainter {
           RRect.fromRectAndRadius(rect, radius),
           Paint()..color = color.withValues(alpha: 1 - Curves.easeIn.transform(t)),
         );
+      }
+    }
+
+    // A few sparks flying out of every cleared cell.
+    if (cleared.isNotEmpty && t < 1) {
+      final spread = Curves.easeOut.transform(t);
+      for (var i = 0; i < cleared.length; i++) {
+        final cell = cleared[i];
+        final center = g.cellRect(cell.row, cell.col).center;
+        for (var k = 0; k < 3; k++) {
+          final angle = i * 2.399 + k * 2.094;
+          final distance = g.cell * (0.4 + 0.9 * spread);
+          final spark = center +
+              Offset(math.cos(angle) * distance, math.sin(angle) * distance);
+          canvas.drawCircle(
+            spark,
+            g.cell * 0.13 * (1 - t),
+            Paint()..color = kBlockColors[cell.color].withValues(alpha: 1 - t),
+          );
+        }
       }
     }
 

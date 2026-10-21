@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'game/mode.dart';
 import 'stats.dart';
 import 'storage.dart';
 import 'theme.dart';
@@ -12,6 +13,9 @@ class AppState extends ChangeNotifier {
         _sound = storage.sound,
         _haptics = storage.haptics,
         _best = storage.best,
+        _bestRelaxed = storage.bestRelaxed,
+        _bestTimed = storage.bestTimed,
+        _daily = _parseDaily(storage.dailyRaw),
         _paletteIndex = _clampIndex(storage.palette, kPalettes.length),
         _blockStyle = BlockStyle.values[
             _clampIndex(storage.blockStyle, BlockStyle.values.length)],
@@ -29,6 +33,21 @@ class AppState extends ChangeNotifier {
   bool _sound;
   bool _haptics;
   int _best;
+  int _bestRelaxed;
+  int _bestTimed;
+  ({int seed, int score}) _daily;
+
+  static ({int seed, int score}) _parseDaily(String raw) {
+    final parts = raw.split(':');
+    if (parts.length == 2) {
+      final seed = int.tryParse(parts[0]);
+      final score = int.tryParse(parts[1]);
+      if (seed != null && score != null && score >= 0) {
+        return (seed: seed, score: score);
+      }
+    }
+    return (seed: 0, score: 0);
+  }
   int _paletteIndex;
   BlockStyle _blockStyle;
   bool _leftHanded;
@@ -92,11 +111,38 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Remembers [score] if it beats the best one.
-  void submitScore(int score) {
-    if (score <= _best) return;
-    _best = score;
-    storage.setBest(score);
+  /// The best score of [mode]. For the Daily Challenge it is today's best.
+  int bestFor(GameMode mode) {
+    switch (mode) {
+      case GameMode.classic:
+        return _best;
+      case GameMode.relaxed:
+        return _bestRelaxed;
+      case GameMode.timed:
+        return _bestTimed;
+      case GameMode.daily:
+        return _daily.seed == dailySeed(DateTime.now()) ? _daily.score : 0;
+    }
+  }
+
+  /// Remembers [score] if it beats the best one of [mode].
+  void submitScore(int score, {GameMode mode = GameMode.classic}) {
+    if (score <= bestFor(mode)) return;
+    switch (mode) {
+      case GameMode.classic:
+        _best = score;
+        storage.setBest(score);
+      case GameMode.relaxed:
+        _bestRelaxed = score;
+        storage.setBestRelaxed(score);
+      case GameMode.timed:
+        _bestTimed = score;
+        storage.setBestTimed(score);
+      case GameMode.daily:
+        final seed = dailySeed(DateTime.now());
+        _daily = (seed: seed, score: score);
+        storage.saveDaily('$seed:$score');
+    }
     notifyListeners();
   }
 

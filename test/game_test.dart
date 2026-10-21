@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:cuboo/game/game.dart';
+import 'package:cuboo/game/mode.dart';
 import 'package:cuboo/game/shapes.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -348,5 +349,74 @@ void main() {
     if (game.over) {
       expect(game.hasMove, isFalse);
     }
+  });
+
+  group('hints, modes and the daily challenge', () {
+    test('the hint picks a move that clears a line', () {
+      final board = emptyBoard();
+      for (var c = 0; c < kBoardSize - 1; c++) {
+        board[0][c] = 0;
+      }
+      final game = CubooGame.withState(
+        board: board,
+        tray: [piece('dot'), piece('h2'), piece('sq2')],
+      );
+      final hint = game.findHint()!;
+      expect(hint.index, 0);
+      expect(hint.r, 0);
+      expect(hint.c, kBoardSize - 1);
+      expect(game.preview(hint.index, hint.r, hint.c)!.rows, {0});
+    });
+
+    test('there is no hint when nothing fits', () {
+      final board = [
+        for (var r = 0; r < kBoardSize; r++) List<int>.filled(kBoardSize, 0),
+      ];
+      board[0][0] = -1;
+      final game = CubooGame.withState(
+        board: board,
+        tray: [piece('h2'), null, null],
+      );
+      expect(game.findHint(), isNull);
+    });
+
+    test('clearBoard empties the board and keeps the score', () {
+      final board = [
+        for (var r = 0; r < kBoardSize; r++) List<int>.filled(kBoardSize, 1),
+      ];
+      board[0][0] = -1;
+      final game = CubooGame.withState(
+        board: board,
+        tray: [piece('h2'), piece('v2'), null],
+        score: 120,
+      );
+      expect(game.over, isTrue);
+      game.clearBoard();
+      expect(game.over, isFalse);
+      expect(game.score, 120);
+      for (final row in game.board) {
+        expect(row.every((v) => v == -1), isTrue);
+      }
+    });
+
+    test('the same seed gives the same pieces', () {
+      final a = CubooGame(random: Random(20261021));
+      final b = CubooGame(random: Random(20261021));
+      expect(
+        [for (final p in a.tray) p!.shape.id],
+        [for (final p in b.tray) p!.shape.id],
+      );
+    });
+
+    test('dailySeed is the date as a number', () {
+      expect(dailySeed(DateTime(2026, 10, 21)), 20261021);
+      expect(dailySeed(DateTime(2027, 1, 5)), 20270105);
+    });
+
+    test('mode names are parsed, unknown ones fall back to classic', () {
+      expect(GameModeInfo.parse('timed'), GameMode.timed);
+      expect(GameModeInfo.parse('nope'), GameMode.classic);
+      expect(GameModeInfo.parse(null), GameMode.classic);
+    });
   });
 }
