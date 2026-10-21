@@ -154,6 +154,16 @@ List<Shape> _buildShapes() {
 /// Every shape the game can hand out.
 final List<Shape> kShapes = _buildShapes();
 
+/// The shape that [shape] becomes when turned a quarter turn. Shapes that
+/// look the same turned (like the 2x2 square) come back unchanged.
+Shape rotateShape(Shape shape) {
+  final wanted = _signature(_rotate(shape.cells));
+  for (final s in kShapes) {
+    if (_signature(s.cells) == wanted) return s;
+  }
+  return shape;
+}
+
 /// Looks a shape up by its id, or returns null when it does not exist.
 Shape? shapeById(String id) {
   for (final s in kShapes) {

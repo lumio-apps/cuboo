@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'game/mode.dart';
+import 'sound.dart';
 import 'stats.dart';
 import 'storage.dart';
 import 'theme.dart';
@@ -28,6 +31,7 @@ class AppState extends ChangeNotifier {
   }
 
   final GameStorage storage;
+  final SoundPlayer _player = SoundPlayer();
 
   ThemeMode _themeMode;
   bool _sound;
@@ -218,17 +222,27 @@ class AppState extends ChangeNotifier {
     if (_haptics) HapticFeedback.selectionClick();
   }
 
-  void placeFeedback() {
-    if (_haptics) HapticFeedback.lightImpact();
-    if (_sound) SystemSound.play(SystemSoundType.click);
+  void _sfx(String name) {
+    if (_sound) unawaited(_player.play(name));
   }
 
-  void clearFeedback() {
+  void placeFeedback() {
+    if (_haptics) HapticFeedback.lightImpact();
+    _sfx('place');
+  }
+
+  void clearFeedback({int combo = 1}) {
     if (_haptics) HapticFeedback.mediumImpact();
-    if (_sound) SystemSound.play(SystemSoundType.click);
+    _sfx(combo >= 2 ? 'combo' : 'clear');
+  }
+
+  void bombFeedback() {
+    if (_haptics) HapticFeedback.heavyImpact();
+    _sfx('bomb');
   }
 
   void overFeedback() {
     if (_haptics) HapticFeedback.heavyImpact();
+    _sfx('over');
   }
 }

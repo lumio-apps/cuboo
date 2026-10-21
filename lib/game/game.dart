@@ -13,12 +13,16 @@ const int kColorCount = 5;
 
 /// A piece in the tray: a shape plus the colour it will have on the board.
 class Piece {
-  const Piece(this.shape, this.color);
+  const Piece(this.shape, this.color, {this.bomb = false});
 
   final Shape shape;
   final int color;
 
-  Map<String, dynamic> toJson() => {'s': shape.id, 'c': color};
+  /// A bomb is a single block that blows up the 3x3 area around it.
+  final bool bomb;
+
+  Map<String, dynamic> toJson() =>
+      {'s': shape.id, 'c': color, if (bomb) 'b': 1};
 
   static Piece fromJson(Map<String, dynamic> json) {
     final shape = shapeById(json['s'] as String);
@@ -29,7 +33,11 @@ class Piece {
     if (color < 0 || color >= kColorCount) {
       throw const FormatException('Bad colour');
     }
-    return Piece(shape, color);
+    final bomb = json['b'] == 1;
+    if (bomb && shape.id != 'dot') {
+      throw const FormatException('Bad bomb');
+    }
+    return Piece(shape, color, bomb: bomb);
   }
 }
 
@@ -76,9 +84,17 @@ class Hint {
 
 /// What would happen if a piece were dropped at a position.
 class Preview {
-  const Preview({required this.cells, required this.rows, required this.cols});
+  const Preview({
+    required this.cells,
+    required this.rows,
+    required this.cols,
+    this.blast = const [],
+  });
 
   final List<Pos> cells;
+
+  /// For a bomb: every cell of the 3x3 area that would blow up.
+  final List<Pos> blast;
 
   /// Rows and columns that would be completed.
   final Set<int> rows;
@@ -228,6 +244,14 @@ class CubooGame {
     if (!canPlace(index, r, c)) return null;
     final piece = tray[index]!;
     final cells = piece.shape.at(r, c);
+    if (piece.bomb) {
+      return Preview(
+        cells: cells,
+        rows: const {},
+        cols: const {},
+        blast: _blastArea(r, c),
+      );
+    }
     final taken = <int>{for (final p in cells) p.r * kBoardSize + p.c};
     bool filled(int rr, int cc) =>
         board[rr][cc] != -1 || taken.contains(rr * kBoardSize + cc);
@@ -258,6 +282,28 @@ class CubooGame {
       score: score,
       combo: combo,
     );
+
+    if (piece.bomb) {
+      final blown = <ClearedCell>[
+        ClearedCell(r, c, piece.color),
+        for (final p in _blastArea(r, c))
+          if ((p.r != r || p.c != c) && board[p.r][p.c] != -1)
+            ClearedCell(p.r, p.c, board[p.r][p.c]),
+      ];
+      for (final cell in blown) {
+        board[cell.row][cell.col] = -1;
+      }
+      final bombGain = blown.length * 5;
+      score += bombGain;
+      _useSlot(index);
+      return PlaceResult(
+        placed: const [],
+        cleared: blown,
+        lines: 0,
+        gained: bombGain,
+        combo: combo,
+      );
+    }
 
     final placed = piece.shape.at(r, c);
     for (final p in placed) {
@@ -307,14 +353,7 @@ class CubooGame {
     }
     score += gained;
 
-    tray[index] = null;
-    var allUsed = true;
-    for (final p in tray) {
-      if (p != null) allUsed = false;
-    }
-    if (allUsed) _refill();
-
-    over = !hasMove;
+    _useSlot(index);
 
     return PlaceResult(
       placed: placed,
@@ -323,6 +362,41 @@ class CubooGame {
       gained: gained,
       combo: combo,
     );
+  }
+
+  /// The cells of the 3x3 area around ([r], [c]) that are on the board.
+  List<Pos> _blastArea(int r, int c) => [
+        for (var dr = -1; dr <= 1; dr++)
+          for (var dc = -1; dc <= 1; dc++)
+            if (r + dr >= 0 &&
+                r + dr < kBoardSize &&
+                c + dc >= 0 &&
+                c + dc < kBoardSize)
+              Pos(r + dr, c + dc),
+      ];
+
+  /// Marks a tray slot as used, refills the tray when it is empty and works
+  /// out whether the game is over.
+  void _useSlot(int index) {
+    tray[index] = null;
+    var allUsed = true;
+    for (final p in tray) {
+      if (p != null) allUsed = false;
+    }
+    if (allUsed) _refill();
+    over = !hasMove;
+  }
+
+  /// Turns tray piece [index] a quarter turn. Returns false when nothing
+  /// changed (empty slot, bomb, or a piece that looks the same turned).
+  bool rotate(int index) {
+    if (index < 0 || index >= kTraySize) return false;
+    final piece = tray[index];
+    if (piece == null || piece.bomb) return false;
+    final turned = rotateShape(piece.shape);
+    if (identical(turned, piece.shape)) return false;
+    tray[index] = Piece(turned, piece.color);
+    return true;
   }
 
   /// The move that clears the most lines (the first one found wins a tie),
@@ -400,8 +474,26 @@ class CubooGame {
       for (var i = 0; i < kTraySize; i++) {
         tray[i] = _randomPiece();
       }
-      if (hasMove) return;
+      if (hasMove) break;
     }
+    // Sometimes one piece is a bomb. The dice are always rolled, so the Daily
+    // Challenge deals the same pieces to everybody.
+    final roll = _random.nextInt(10);
+    final slot = _random.nextInt(kTraySize);
+    final color = _random.nextInt(kColorCount);
+    if (roll == 0 && _filledCells() >= 12) {
+      tray[slot] = Piece(shapeById('dot')!, color, bomb: true);
+    }
+  }
+
+  int _filledCells() {
+    var n = 0;
+    for (final row in board) {
+      for (final v in row) {
+        if (v != -1) n++;
+      }
+    }
+    return n;
   }
 
   Map<String, dynamic> toJson() => {

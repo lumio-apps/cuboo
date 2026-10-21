@@ -4,8 +4,10 @@ import '../game/shapes.dart';
 import '../theme.dart';
 
 class _PiecePainter extends CustomPainter {
-  _PiecePainter(this.shape, this.color, this.cell, this.gap)
+  _PiecePainter(this.shape, this.color, this.cell, this.gap, this.bomb)
       : style = BlockLook.style;
+
+  final bool bomb;
 
   final BlockStyle style;
   final Shape shape;
@@ -23,7 +25,20 @@ class _PiecePainter extends CustomPainter {
         cell,
         cell,
       );
-      drawBlock(canvas, RRect.fromRectAndRadius(rect, radius), color);
+      final rrect = RRect.fromRectAndRadius(rect, radius);
+      if (bomb) {
+        canvas.drawRRect(rrect, Paint()..color = const Color(0xFF2A2740));
+        canvas.drawRRect(
+          rrect.deflate(cell * 0.05),
+          Paint()
+            ..color = kCoral
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = cell * 0.1,
+        );
+        canvas.drawCircle(rect.center, cell * 0.17, Paint()..color = kAmber);
+      } else {
+        drawBlock(canvas, rrect, color);
+      }
     }
   }
 
@@ -31,6 +46,7 @@ class _PiecePainter extends CustomPainter {
   bool shouldRepaint(covariant _PiecePainter oldDelegate) =>
       oldDelegate.shape != shape ||
       oldDelegate.style != style ||
+      oldDelegate.bomb != bomb ||
       oldDelegate.color != color ||
       oldDelegate.cell != cell ||
       oldDelegate.gap != gap;
@@ -50,18 +66,20 @@ class PieceView extends StatelessWidget {
     required this.color,
     required this.cell,
     this.gap = 3,
+    this.bomb = false,
   });
 
   final Shape shape;
   final Color color;
   final double cell;
   final double gap;
+  final bool bomb;
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       size: pieceSize(shape, cell, gap),
-      painter: _PiecePainter(shape, color, cell, gap),
+      painter: _PiecePainter(shape, color, cell, gap, bomb),
     );
   }
 }

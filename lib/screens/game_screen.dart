@@ -80,6 +80,7 @@ class _GameScreenState extends State<GameScreen>
   int? _dragIndex;
   int _dragPointer = -1;
   Offset _dragPos = Offset.zero;
+  Offset _dragStart = Offset.zero;
   double _side = 320;
 
   bool _showOver = false;
@@ -249,6 +250,7 @@ class _GameScreenState extends State<GameScreen>
       _dragIndex = index;
       _dragPointer = pointer;
       _dragPos = global;
+      _dragStart = global;
     });
   }
 
@@ -261,7 +263,17 @@ class _GameScreenState extends State<GameScreen>
     final index = _dragIndex;
     if (index == null || pointer != _dragPointer) return;
     final target = _target();
+    final tapped = (_dragPos - _dragStart).distance < 12;
     setState(() => _dragIndex = null);
+    if (tapped && _mode == GameMode.relaxed) {
+      // A tap (no drag) turns the piece in Relaxed mode.
+      if (_game.rotate(index)) {
+        widget.app.tapFeedback();
+        setState(() {});
+        _save();
+      }
+      return;
+    }
     if (target != null && _game.canPlace(index, target.r, target.c)) {
       _place(index, target.r, target.c);
     }
@@ -285,10 +297,14 @@ class _GameScreenState extends State<GameScreen>
       _gainId++;
       _lastGain = result.gained;
       _clearHint();
-      if (result.lines >= 3 || result.combo >= 4) _shakeId++;
+      if (result.placed.isEmpty || result.lines >= 3 || result.combo >= 4) {
+        _shakeId++;
+      }
     });
-    if (result.lines > 0) {
-      widget.app.clearFeedback();
+    if (result.placed.isEmpty) {
+      widget.app.bombFeedback();
+    } else if (result.lines > 0) {
+      widget.app.clearFeedback(combo: result.combo);
     } else {
       widget.app.placeFeedback();
     }
@@ -707,19 +723,23 @@ class _GameScreenState extends State<GameScreen>
     if (index == null && hint != null && _game.tray[hint.index] != null) {
       final preview = _game.preview(hint.index, hint.r, hint.c);
       if (preview != null) {
-        ghost = preview.cells;
+        ghost = preview.blast.isNotEmpty ? preview.blast : preview.cells;
         hotRows = preview.rows;
         hotCols = preview.cols;
-        ghostColor = kBlockColors[_game.tray[hint.index]!.color];
+        ghostColor = _game.tray[hint.index]!.bomb
+            ? kCoral
+            : kBlockColors[_game.tray[hint.index]!.color];
       }
     }
     if (index != null && target != null) {
       final preview = _game.preview(index, target.r, target.c);
       if (preview != null) {
-        ghost = preview.cells;
+        ghost = preview.blast.isNotEmpty ? preview.blast : preview.cells;
         hotRows = preview.rows;
         hotCols = preview.cols;
-        ghostColor = kBlockColors[_game.tray[index]!.color];
+        ghostColor = _game.tray[index]!.bomb
+            ? kCoral
+            : kBlockColors[_game.tray[index]!.color];
       }
     }
     final reduce = MediaQuery.disableAnimationsOf(context);
@@ -848,6 +868,7 @@ class _GameScreenState extends State<GameScreen>
                   shape: shape,
                   color: kBlockColors[piece.color],
                   cell: cell,
+                  bomb: piece.bomb,
                 ),
               ),
             ),
@@ -872,6 +893,7 @@ class _GameScreenState extends State<GameScreen>
           shape: piece.shape,
           color: kBlockColors[piece.color],
           cell: g.cell,
+          bomb: piece.bomb,
         ),
       ),
     );

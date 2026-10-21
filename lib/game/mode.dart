@@ -23,7 +23,7 @@ extension GameModeInfo on GameMode {
       case GameMode.classic:
         return 'The normal game. It ends when no piece fits.';
       case GameMode.relaxed:
-        return 'Never ends. When you are stuck, the board is cleared.';
+        return 'Never ends. Tap a piece to turn it. When you are stuck, the board is cleared.';
       case GameMode.timed:
         return 'Score as much as you can in 2 minutes.';
       case GameMode.daily:

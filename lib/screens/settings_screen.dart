@@ -105,7 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: app.setSound,
                     title: const _TileTitle('Sound'),
                     subtitle:
-                        const _TileSubtitle('A soft click when you place blocks'),
+                        const _TileSubtitle('Short sounds when you play'),
                   ),
                   SwitchListTile(
                     value: app.haptics,

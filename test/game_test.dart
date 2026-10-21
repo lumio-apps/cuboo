@@ -419,4 +419,96 @@ void main() {
       expect(GameModeInfo.parse(null), GameMode.classic);
     });
   });
+
+  group('rotating and bombs', () {
+    test('rotateShape turns lines and keeps squares', () {
+      expect(rotateShape(shapeById('h2')!).id, 'v2');
+      expect(rotateShape(shapeById('v3')!).id, 'h3');
+      expect(rotateShape(shapeById('r23')!).id, 'r32');
+      final square = shapeById('sq2')!;
+      expect(identical(rotateShape(square), square), isTrue);
+    });
+
+    test('four turns bring every shape back', () {
+      for (final shape in kShapes) {
+        var turned = shape;
+        for (var i = 0; i < 4; i++) {
+          turned = rotateShape(turned);
+          expect(turned.size, shape.size);
+        }
+        expect(turned.id, shape.id);
+      }
+    });
+
+    test('rotate changes the tray piece but not bombs or squares', () {
+      final game = CubooGame.withState(
+        board: emptyBoard(),
+        tray: [
+          piece('h3', 2),
+          Piece(shapeById('dot')!, 0, bomb: true),
+          piece('sq2'),
+        ],
+      );
+      expect(game.rotate(0), isTrue);
+      expect(game.tray[0]!.shape.id, 'v3');
+      expect(game.tray[0]!.color, 2);
+      expect(game.rotate(1), isFalse);
+      expect(game.rotate(2), isFalse);
+    });
+
+    test('a bomb clears the 3x3 area around it', () {
+      final board = emptyBoard();
+      for (var r = 3; r <= 5; r++) {
+        for (var c = 3; c <= 5; c++) {
+          board[r][c] = 1;
+        }
+      }
+      board[4][4] = -1;
+      board[0][0] = 2; // far away, must stay
+      final game = CubooGame.withState(
+        board: board,
+        tray: [
+          Piece(shapeById('dot')!, 0, bomb: true),
+          piece('dot'),
+          piece('dot'),
+        ],
+        combo: 3,
+      );
+      final result = game.place(0, 4, 4)!;
+      expect(result.placed, isEmpty);
+      expect(result.cleared.length, 9);
+      expect(result.lines, 0);
+      expect(result.gained, 45);
+      expect(game.score, 45);
+      expect(game.combo, 3);
+      expect(game.board[3][3], -1);
+      expect(game.board[5][5], -1);
+      expect(game.board[0][0], 2);
+    });
+
+    test('a bomb in a corner only blasts what is on the board', () {
+      final game = CubooGame.withState(
+        board: emptyBoard(),
+        tray: [Piece(shapeById('dot')!, 0, bomb: true), null, null],
+      );
+      final pre = game.preview(0, 0, 0)!;
+      expect(pre.blast.length, 4);
+      expect(pre.rows, isEmpty);
+    });
+
+    test('a bomb survives saving and loading', () {
+      final game = CubooGame.withState(
+        board: emptyBoard(),
+        tray: [Piece(shapeById('dot')!, 1, bomb: true), piece('h2'), null],
+      );
+      final copy = CubooGame.fromJson(
+        jsonDecode(jsonEncode(game.toJson())) as Map<String, dynamic>,
+      );
+      expect(copy.tray[0]!.bomb, isTrue);
+      expect(copy.tray[1]!.bomb, isFalse);
+      final bad = game.toJson();
+      (bad['tray'] as List<dynamic>)[0] = {'s': 'h2', 'c': 0, 'b': 1};
+      expect(() => CubooGame.fromJson(bad), throwsFormatException);
+    });
+  });
 }
