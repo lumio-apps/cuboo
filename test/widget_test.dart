@@ -1,5 +1,6 @@
 import 'package:cuboo/app.dart';
 import 'package:cuboo/app_state.dart';
+import 'package:cuboo/stats.dart';
 import 'package:cuboo/storage.dart';
 import 'package:cuboo/theme.dart';
 import 'package:cuboo/update_service.dart';
@@ -19,6 +20,7 @@ void main() {
     expect(find.text('Best score'), findsOneWidget);
     expect(find.text('Themes'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Stats'), findsOneWidget);
   });
 
   testWidgets('Play opens the game with an empty board and a tray',
@@ -57,6 +59,64 @@ void main() {
       expect(again.haptics, isFalse);
       expect(again.themeMode, ThemeMode.dark);
       expect(again.best, 120);
+    });
+  });
+
+  group('Stats and achievements', () {
+    test('count moves and games, and unlock achievements once', () {
+      final storage = GameStorage.inMemory();
+      final app = AppState(storage);
+
+      var fresh = app.recordMove(lines: 3, combo: 1, score: 40);
+      expect(fresh.map((a) => a.id), containsAll(['first_clear', 'triple']));
+      expect(app.stats.totalLines, 3);
+      expect(app.stats.bestMoveLines, 3);
+
+      fresh = app.recordMove(lines: 1, combo: 2, score: 60);
+      expect(fresh, isEmpty);
+      expect(app.stats.totalLines, 4);
+      expect(app.stats.bestCombo, 2);
+
+      app.recordGameOver(60);
+      app.recordGameOver(100);
+      expect(app.stats.games, 2);
+      expect(app.stats.average, 80);
+      expect(app.history, [100, 60]);
+
+      final again = AppState(storage);
+      expect(again.stats.totalLines, 4);
+      expect(again.history, [100, 60]);
+      expect(again.unlocked, containsAll(['first_clear', 'triple']));
+    });
+
+    test('history keeps only the latest ten scores', () {
+      final app = AppState(GameStorage.inMemory());
+      for (var i = 1; i <= 12; i++) {
+        app.recordGameOver(i);
+      }
+      expect(app.history.length, 10);
+      expect(app.history.first, 12);
+      expect(app.history.last, 3);
+    });
+
+    test('broken saved stats give empty stats', () {
+      expect(Stats.parse('not json').games, 0);
+      expect(Stats.parse('').totalLines, 0);
+    });
+
+    test('block look and left-handed mode are remembered', () {
+      final storage = GameStorage.inMemory();
+      final app = AppState(storage);
+      app.setPalette(2);
+      app.setBlockStyle(BlockStyle.glossy);
+      app.setLeftHanded(true);
+      final again = AppState(storage);
+      expect(again.paletteIndex, 2);
+      expect(again.blockStyle, BlockStyle.glossy);
+      expect(again.leftHanded, isTrue);
+      // Put the global look back for other tests.
+      again.setPalette(0);
+      again.setBlockStyle(BlockStyle.flat);
     });
   });
 

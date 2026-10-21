@@ -114,6 +114,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle:
                         const _TileSubtitle('Gentle feedback while you play'),
                   ),
+                  SwitchListTile(
+                    value: app.leftHanded,
+                    onChanged: app.setLeftHanded,
+                    title: const _TileTitle('Left-handed mode'),
+                    subtitle: const _TileSubtitle(
+                      'Mirrors the pieces and the top bar in the game',
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),

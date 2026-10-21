@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../game/shapes.dart';
+import '../theme.dart';
 
 class _PiecePainter extends CustomPainter {
-  _PiecePainter(this.shape, this.color, this.cell, this.gap);
+  _PiecePainter(this.shape, this.color, this.cell, this.gap)
+      : style = BlockLook.style;
 
+  final BlockStyle style;
   final Shape shape;
   final Color color;
   final double cell;
@@ -12,7 +15,6 @@ class _PiecePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
     final radius = Radius.circular(cell * 0.28);
     for (final p in shape.cells) {
       final rect = Rect.fromLTWH(
@@ -21,13 +23,14 @@ class _PiecePainter extends CustomPainter {
         cell,
         cell,
       );
-      canvas.drawRRect(RRect.fromRectAndRadius(rect, radius), paint);
+      drawBlock(canvas, RRect.fromRectAndRadius(rect, radius), color);
     }
   }
 
   @override
   bool shouldRepaint(covariant _PiecePainter oldDelegate) =>
       oldDelegate.shape != shape ||
+      oldDelegate.style != style ||
       oldDelegate.color != color ||
       oldDelegate.cell != cell ||
       oldDelegate.gap != gap;

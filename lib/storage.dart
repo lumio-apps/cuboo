@@ -19,6 +19,12 @@ class GameStorage {
   static const String _kSound = 'cuboo.sound';
   static const String _kHaptics = 'cuboo.haptics';
   static const String _kGame = 'cuboo.game';
+  static const String _kPalette = 'cuboo.palette';
+  static const String _kBlockStyle = 'cuboo.blockStyle';
+  static const String _kLeftHanded = 'cuboo.leftHanded';
+  static const String _kStats = 'cuboo.stats';
+  static const String _kHistory = 'cuboo.history';
+  static const String _kAchievements = 'cuboo.achievements';
 
   T _get<T extends Object>(String key, T fallback) {
     try {
@@ -82,4 +88,25 @@ class GameStorage {
 
   Future<bool> saveGame(String json) => _set(_kGame, json);
   Future<bool> clearGame() => _remove(_kGame);
+
+  int get palette => _get<int>(_kPalette, 0);
+  Future<bool> setPalette(int value) => _set(_kPalette, value);
+
+  int get blockStyle => _get<int>(_kBlockStyle, 0);
+  Future<bool> setBlockStyle(int value) => _set(_kBlockStyle, value);
+
+  bool get leftHanded => _get<bool>(_kLeftHanded, false);
+  Future<bool> setLeftHanded(bool value) => _set(_kLeftHanded, value);
+
+  /// Lifetime stats as JSON text ('' when there are none yet).
+  String get statsJson => _get<String>(_kStats, '');
+  Future<bool> saveStats(String json) => _set(_kStats, json);
+
+  /// Recent scores, newest first, joined with commas.
+  String get historyRaw => _get<String>(_kHistory, '');
+  Future<bool> saveHistory(String raw) => _set(_kHistory, raw);
+
+  /// Unlocked achievement ids, joined with commas.
+  String get achievementsRaw => _get<String>(_kAchievements, '');
+  Future<bool> saveAchievements(String raw) => _set(_kAchievements, raw);
 }

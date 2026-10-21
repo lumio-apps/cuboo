@@ -7,6 +7,7 @@ import '../widgets/logo.dart';
 import '../widgets/scaffold.dart';
 import 'game_screen.dart';
 import 'settings_screen.dart';
+import 'stats_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.app});
@@ -60,12 +61,22 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  void _openStats() {
+    widget.app.tapFeedback();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StatsScreen(app: widget.app),
+      ),
+    );
+  }
+
   void _openThemes() {
     widget.app.tapFeedback();
     final c = CubooColors.of(context);
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: c.surface,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -185,13 +196,20 @@ class _HomeScreenState extends State<HomeScreen>
                               const SizedBox(width: 16),
                               Expanded(
                                 child: SoftButton(
-                                  label: 'Settings',
-                                  icon: Icons.tune_rounded,
+                                  label: 'Stats',
+                                  icon: Icons.bar_chart_rounded,
                                   height: 64,
-                                  onPressed: _openSettings,
+                                  onPressed: _openStats,
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 16),
+                          SoftButton(
+                            label: 'Settings',
+                            icon: Icons.tune_rounded,
+                            height: 56,
+                            onPressed: _openSettings,
                           ),
                           const SizedBox(height: 24),
                           Text(
@@ -225,7 +243,7 @@ class _ThemeSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = CubooColors.of(context);
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -273,7 +291,131 @@ class _ThemeSheet extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 24),
+            Text(
+              'Block colours',
+              style: TextStyle(
+                color: c.text,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (var i = 0; i < kPalettes.length; i++)
+                  _PaletteChip(
+                    palette: kPalettes[i],
+                    selected: app.paletteIndex == i,
+                    onTap: () => app.setPalette(i),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Block style',
+              style: TextStyle(
+                color: c.text,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<BlockStyle>(
+                segments: const [
+                  ButtonSegment<BlockStyle>(
+                    value: BlockStyle.flat,
+                    label: Text('Flat'),
+                  ),
+                  ButtonSegment<BlockStyle>(
+                    value: BlockStyle.glossy,
+                    label: Text('Glossy'),
+                  ),
+                  ButtonSegment<BlockStyle>(
+                    value: BlockStyle.outlined,
+                    label: Text('Outline'),
+                  ),
+                ],
+                selected: {app.blockStyle},
+                onSelectionChanged: (selection) =>
+                    app.setBlockStyle(selection.first),
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PaletteChip extends StatelessWidget {
+  const _PaletteChip({
+    required this.palette,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final BlockPalette palette;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = CubooColors.of(context);
+    final radius = BorderRadius.circular(16);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${palette.name} block colours',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            color: c.surfaceAlt,
+            border: Border.all(
+              color: selected ? kCoral : Colors.transparent,
+              width: 3,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final color in palette.colors)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const SizedBox(width: 14, height: 14),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  palette.name,
+                  style: TextStyle(
+                    color: c.text,
+                    fontSize: 14,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

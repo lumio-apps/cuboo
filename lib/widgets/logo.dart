@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 
 // The logo is a letter "C" built from blocks, with a dashed empty slot.
-// (column, row, colour index into kBlockColors)
+// (column, row, colour index into kClassicColors)
 const List<List<int>> _logoCells = [
   [0, 0, 0],
   [1, 0, 1],
@@ -51,7 +51,7 @@ class _LogoPainter extends CustomPainter {
       );
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, radius),
-        Paint()..color = kBlockColors[spec[2]],
+        Paint()..color = kClassicColors[spec[2]],
       );
     }
 

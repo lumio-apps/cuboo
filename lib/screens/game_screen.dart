@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../game/game.dart';
 import '../game/shapes.dart';
+import '../stats.dart';
 import '../theme.dart';
 import '../widgets/board_view.dart';
 import '../widgets/buttons.dart';
@@ -194,6 +195,11 @@ class _GameScreenState extends State<GameScreen>
     } else {
       widget.app.placeFeedback();
     }
+    _announce(widget.app.recordMove(
+      lines: result.lines,
+      combo: result.combo,
+      score: _game.score,
+    ));
     if (_game.over) {
       _finish();
     } else {
@@ -206,12 +212,27 @@ class _GameScreenState extends State<GameScreen>
     _previousBest = app.best;
     _newBest = _game.score > app.best;
     app.submitScore(_game.score);
+    _announce(app.recordGameOver(_game.score));
     app.storage.clearGame();
     app.overFeedback();
     _overTimer?.cancel();
     _overTimer = Timer(const Duration(milliseconds: 700), () {
       if (mounted) setState(() => _showOver = true);
     });
+  }
+
+  void _announce(List<Achievement> unlocked) {
+    if (unlocked.isEmpty || !mounted) return;
+    final names = unlocked.map((a) => a.title).join(', ');
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Achievement unlocked: $names'),
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _undo() {
@@ -360,14 +381,16 @@ class _GameScreenState extends State<GameScreen>
   Widget _header(CubooColors c) {
     final reduce = MediaQuery.disableAnimationsOf(context);
     final best = math.max(widget.app.best, _game.score);
+    final left = widget.app.leftHanded;
     return SizedBox(
       height: 60,
       child: Row(
+        textDirection: left ? TextDirection.rtl : TextDirection.ltr,
         children: [
           SizedBox(
             width: 96,
             child: Align(
-              alignment: Alignment.centerLeft,
+              alignment: left ? Alignment.centerRight : Alignment.centerLeft,
               child: IconSquareButton(
                 icon: Icons.pause_rounded,
                 tooltip: 'Pause',
@@ -413,7 +436,8 @@ class _GameScreenState extends State<GameScreen>
             width: 96,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment:
+                  left ? CrossAxisAlignment.start : CrossAxisAlignment.end,
               children: [
                 Text(
                   'BEST',
@@ -426,7 +450,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
                 FittedBox(
                   fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
+                  alignment: left ? Alignment.centerLeft : Alignment.centerRight,
                   child: Text(
                     formatScore(best),
                     style: TextStyle(
@@ -555,16 +579,20 @@ class _GameScreenState extends State<GameScreen>
 
   Widget _tray(CubooColors c) {
     final slotWidth = (_side - 24) / kTraySize;
+    final order = [
+      for (var i = 0; i < kTraySize; i++) i,
+    ];
+    if (widget.app.leftHanded) order.setAll(0, order.reversed.toList());
     return AnimatedBuilder(
       animation: _bob,
       builder: (context, _) => Row(
         children: [
-          for (var i = 0; i < kTraySize; i++) ...[
-            if (i > 0) const SizedBox(width: 12),
+          for (var n = 0; n < kTraySize; n++) ...[
+            if (n > 0) const SizedBox(width: 12),
             SizedBox(
               width: slotWidth,
               height: _trayHeight,
-              child: _slot(i, c, slotWidth),
+              child: _slot(order[n], c, slotWidth),
             ),
           ],
         ],

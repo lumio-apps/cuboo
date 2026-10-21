@@ -1,13 +1,104 @@
 import 'package:flutter/material.dart';
 
-/// The five block colours. The same in light and dark mode.
-const List<Color> kBlockColors = [
+/// The classic block colours. The logo always uses these.
+const List<Color> kClassicColors = [
   Color(0xFFFF6B5B), // coral
   Color(0xFFFFC24D), // amber
   Color(0xFF2EC4B6), // teal
   Color(0xFF4DA3FF), // sky
   Color(0xFF8B7CFF), // violet
 ];
+
+/// A named set of five block colours.
+class BlockPalette {
+  const BlockPalette(this.name, this.colors);
+
+  final String name;
+  final List<Color> colors;
+}
+
+const List<BlockPalette> kPalettes = [
+  BlockPalette('Classic', kClassicColors),
+  BlockPalette('Candy', [
+    Color(0xFFFF7EB6),
+    Color(0xFFFFD866),
+    Color(0xFF7BE0AD),
+    Color(0xFF7AB8FF),
+    Color(0xFFC39BFF),
+  ]),
+  BlockPalette('Ocean', [
+    Color(0xFF0077B6),
+    Color(0xFF00B4D8),
+    Color(0xFF2EC4B6),
+    Color(0xFF5E60CE),
+    Color(0xFF48CAE4),
+  ]),
+  BlockPalette('Forest', [
+    Color(0xFF2D6A4F),
+    Color(0xFF52B788),
+    Color(0xFFE9C46A),
+    Color(0xFFBC6C25),
+    Color(0xFF95D5B2),
+  ]),
+  BlockPalette('Mono', [
+    Color(0xFF2B3454),
+    Color(0xFF3F4A6B),
+    Color(0xFF5C6784),
+    Color(0xFF7B88A8),
+    Color(0xFF9AA5C4),
+  ]),
+];
+
+/// How a single block is drawn.
+enum BlockStyle { flat, glossy, outlined }
+
+/// The block look that is currently selected (set by AppState).
+class BlockLook {
+  BlockLook._();
+
+  static int paletteIndex = 0;
+  static BlockStyle style = BlockStyle.flat;
+}
+
+/// The block colours of the selected palette.
+List<Color> get kBlockColors => kPalettes[BlockLook.paletteIndex].colors;
+
+/// Draws one block in the selected [BlockStyle].
+void drawBlock(Canvas canvas, RRect rrect, Color color) {
+  switch (BlockLook.style) {
+    case BlockStyle.flat:
+      canvas.drawRRect(rrect, Paint()..color = color);
+    case BlockStyle.glossy:
+      canvas.drawRRect(rrect, Paint()..color = color);
+      final r = rrect.outerRect;
+      final shine = RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          r.left + r.width * 0.14,
+          r.top + r.height * 0.1,
+          r.width * 0.72,
+          r.height * 0.3,
+        ),
+        Radius.circular(r.height * 0.15),
+      );
+      canvas.drawRRect(
+        shine,
+        Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.3),
+      );
+    case BlockStyle.outlined:
+      canvas.drawRRect(
+        rrect,
+        Paint()..color = color.withValues(alpha: 0.3),
+      );
+      final width = rrect.outerRect.width * 0.12;
+      canvas.drawRRect(
+        rrect.deflate(width / 2),
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width,
+      );
+  }
+}
 
 const Color kCoral = Color(0xFFFF6B5B);
 const Color kAmber = Color(0xFFFFC24D);

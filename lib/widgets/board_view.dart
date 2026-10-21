@@ -77,9 +77,10 @@ class _BoardPainter extends CustomPainter {
           if (placed.contains(r * kBoardSize + c)) {
             drawRect = _scaled(rect, 0.4 + 0.6 * Curves.easeOutBack.transform(t));
           }
-          canvas.drawRRect(
+          drawBlock(
+            canvas,
             RRect.fromRectAndRadius(drawRect, radius),
-            Paint()..color = kBlockColors[v],
+            kBlockColors[v],
           );
         }
         if (hotRows.contains(r) || hotCols.contains(c)) {
