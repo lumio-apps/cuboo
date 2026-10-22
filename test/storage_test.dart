@@ -80,4 +80,26 @@ void main() {
     expect(storage.best, 0);
     expect(AppState(storage).launches, 1);
   });
+
+  test('an old backup file is moved into the normal storage', () async {
+    SharedPreferences.setMockInitialValues({'cuboo.best': 70});
+    SharedPreferences.resetStatic();
+    final prefs = await SharedPreferences.getInstance();
+
+    final dir = Directory.systemTemp.createTempSync('cuboo_test');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final file = File('${dir.path}/cuboo_data.json');
+    file.writeAsStringSync(
+      '{"cuboo.best": 900, "cuboo.stats": "x", "cuboo.sound": false, "other": 1}',
+    );
+
+    await GameStorage.importBackup(prefs, file);
+
+    expect(prefs.getInt('cuboo.best'), 70); // already there, kept
+    expect(prefs.getString('cuboo.stats'), 'x');
+    expect(prefs.getBool('cuboo.sound'), false);
+    expect(prefs.containsKey('other'), isFalse);
+    expect(file.existsSync(), isFalse);
+    expect(File('${file.path}.migrated').existsSync(), isTrue);
+  });
 }

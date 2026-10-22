@@ -60,6 +60,7 @@ class _BootstrapState extends State<_Bootstrap> {
       try {
         final prefs = await SharedPreferences.getInstance()
             .timeout(const Duration(seconds: 10));
+        await _importOldBackup(prefs);
         storage = GameStorage(prefs);
       } catch (e) {
         error = e;
@@ -74,9 +75,8 @@ class _BootstrapState extends State<_Bootstrap> {
     app.warmUpSound();
   }
 
-  Future<GameStorage> _openBackup(Object? error) async {
-    var problem = (error ?? 'unknown').toString().replaceAll('\n', ' ');
-    if (problem.length > 160) problem = problem.substring(0, 160);
+  /// The private folders where the backup file may live.
+  Future<List<Directory>> _backupFolders() async {
     final folders = <Directory>[];
     try {
       folders.add(await getApplicationSupportDirectory());
@@ -91,7 +91,24 @@ class _BootstrapState extends State<_Bootstrap> {
     } catch (_) {
       // Nothing more to try.
     }
-    for (final folder in folders) {
+    return folders;
+  }
+
+  /// When an earlier version had to save into a backup file, its data is
+  /// moved into the normal storage once that works again.
+  Future<void> _importOldBackup(SharedPreferences prefs) async {
+    for (final folder in await _backupFolders()) {
+      await GameStorage.importBackup(
+        prefs,
+        File('${folder.path}/cuboo_data.json'),
+      );
+    }
+  }
+
+  Future<GameStorage> _openBackup(Object? error) async {
+    var problem = (error ?? 'unknown').toString().replaceAll('\n', ' ');
+    if (problem.length > 160) problem = problem.substring(0, 160);
+    for (final folder in await _backupFolders()) {
       try {
         await folder.create(recursive: true);
         final file = File('${folder.path}/cuboo_data.json');

@@ -61,6 +61,32 @@ class GameStorage {
     return GameStorage._withFile(file, data, problem);
   }
 
+  /// Copies the values of an old backup [file] into [prefs] (only keys that
+  /// are not there yet), then renames the file so it is not used twice.
+  static Future<void> importBackup(SharedPreferences prefs, File file) async {
+    try {
+      if (!await file.exists()) return;
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is Map<String, dynamic>) {
+        for (final entry in decoded.entries) {
+          final key = entry.key;
+          final value = entry.value;
+          if (!key.startsWith('cuboo.') || prefs.containsKey(key)) continue;
+          if (value is int) {
+            await prefs.setInt(key, value);
+          } else if (value is bool) {
+            await prefs.setBool(key, value);
+          } else if (value is String) {
+            await prefs.setString(key, value);
+          }
+        }
+      }
+      await file.rename('${file.path}.migrated');
+    } catch (_) {
+      // Nothing to import, or it could not be read.
+    }
+  }
+
   final SharedPreferences? _prefs;
   final File? _file;
 
