@@ -222,6 +222,9 @@ class AppState extends ChangeNotifier {
     if (_haptics) HapticFeedback.selectionClick();
   }
 
+  /// Loads the sounds in advance so the first one does not stutter.
+  Future<void> warmUpSound() => _player.warmUp();
+
   void _sfx(String name) {
     if (_sound) unawaited(_player.play(name));
   }

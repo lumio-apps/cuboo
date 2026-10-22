@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 
 import '../game/game.dart';
@@ -40,7 +41,11 @@ class _BoardPainter extends CustomPainter {
     required this.hotCols,
     required this.boardColor,
     required this.emptyColor,
-  });
+    required this.moveId,
+  }) : style = BlockLook.style;
+
+  final int moveId;
+  final BlockStyle style;
 
   final List<List<int>> board;
 
@@ -139,8 +144,27 @@ class _BoardPainter extends CustomPainter {
     }
   }
 
+  static bool _samePositions(List<Pos> a, List<Pos> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  // The board only changes together with moveId, so a repaint is needed only
+  // when that, the animation, the preview or the colours change.
   @override
-  bool shouldRepaint(covariant _BoardPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _BoardPainter oldDelegate) =>
+      oldDelegate.t != t ||
+      oldDelegate.moveId != moveId ||
+      oldDelegate.style != style ||
+      oldDelegate.boardColor != boardColor ||
+      oldDelegate.emptyColor != emptyColor ||
+      oldDelegate.ghostColor != ghostColor ||
+      !_samePositions(oldDelegate.ghost, ghost) ||
+      !setEquals(oldDelegate.hotRows, hotRows) ||
+      !setEquals(oldDelegate.hotCols, hotCols);
 }
 
 /// Draws the board. Restarts its small animation whenever [moveId] changes.
@@ -173,7 +197,8 @@ class BoardView extends StatelessWidget {
     final c = CubooColors.of(context);
     final reduce = MediaQuery.disableAnimationsOf(context);
     final placedSet = <int>{for (final p in placed) p.r * kBoardSize + p.c};
-    return Semantics(
+    return RepaintBoundary(
+      child: Semantics(
       label: 'Game board',
       child: SizedBox(
         width: side,
@@ -194,9 +219,11 @@ class BoardView extends StatelessWidget {
               hotCols: hotCols,
               boardColor: c.board,
               emptyColor: c.emptyCell,
+              moveId: moveId,
             ),
           ),
         ),
+      ),
       ),
     );
   }

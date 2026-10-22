@@ -49,17 +49,24 @@ class _BootstrapState extends State<_Bootstrap> {
   }
 
   Future<void> _load() async {
-    GameStorage storage;
-    try {
-      final prefs = await SharedPreferences.getInstance()
-          .timeout(const Duration(seconds: 5));
-      storage = GameStorage(prefs);
-    } catch (_) {
-      // The game still works without saving.
-      storage = GameStorage.inMemory();
+    // Wait patiently for the phone's storage. Starting without it would mean
+    // that nothing is saved, so it is only a last resort.
+    GameStorage? storage;
+    for (var attempt = 0; attempt < 3 && storage == null; attempt++) {
+      try {
+        final prefs = await SharedPreferences.getInstance()
+            .timeout(const Duration(seconds: 10));
+        storage = GameStorage(prefs);
+      } catch (_) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
     }
+    // The game still works without saving.
+    storage ??= GameStorage.unavailable();
     if (!mounted) return;
-    setState(() => _app = AppState(storage));
+    final app = AppState(storage);
+    setState(() => _app = app);
+    app.warmUpSound();
   }
 
   @override

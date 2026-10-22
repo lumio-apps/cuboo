@@ -5,13 +5,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// The keys below must never change between versions, otherwise an update
 /// would lose the player's scores and settings.
 class GameStorage {
-  GameStorage(SharedPreferences prefs) : _prefs = prefs;
+  GameStorage(SharedPreferences prefs)
+      : _prefs = prefs,
+        saveFailed = false;
 
   /// Used when the phone storage cannot be opened (and in tests). Nothing is
   /// saved, but the game still works.
-  GameStorage.inMemory() : _prefs = null;
+  GameStorage.inMemory()
+      : _prefs = null,
+        saveFailed = false;
+
+  /// Like [inMemory], but for when the phone storage could not be opened.
+  /// The home screen tells the player that nothing will be kept.
+  GameStorage.unavailable()
+      : _prefs = null,
+        saveFailed = true;
 
   final SharedPreferences? _prefs;
+
+  /// True when the phone storage could not be opened.
+  final bool saveFailed;
   final Map<String, Object> _memory = {};
 
   static const String _kBest = 'cuboo.best';

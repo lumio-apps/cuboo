@@ -213,6 +213,16 @@ class _HomeScreenState extends State<HomeScreen>
                               fontWeight: FontWeight.w500,
                             ),
                           ),
+                          if (widget.app.storage.saveFailed)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: Text(
+                                'Saving is not available right now, so '
+                                'scores will not be kept. Restart the app.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: c.muted, fontSize: 13),
+                              ),
+                            ),
                           const Spacer(),
                           ScaleTransition(
                             scale: Tween<double>(begin: 1, end: 1.04).animate(

@@ -86,6 +86,9 @@ class _GameScreenState extends State<GameScreen>
   bool _showOver = false;
   bool _newBest = false;
   int _previousBest = 0;
+
+  /// The best score of this mode when the game started, to spot a new best.
+  int _bestBefore = 0;
   Timer? _overTimer;
 
   @override
@@ -93,6 +96,7 @@ class _GameScreenState extends State<GameScreen>
     super.initState();
     _mode = widget.mode ?? GameMode.classic;
     _game = _loadGame();
+    _bestBefore = widget.app.bestFor(_mode);
     _startTicker();
   }
 
@@ -313,8 +317,10 @@ class _GameScreenState extends State<GameScreen>
       combo: result.combo,
       score: _game.score,
     ));
+    // The best score is saved after every move, so it is kept even when the
+    // player leaves before the game is over.
+    widget.app.submitScore(_game.score, mode: _mode);
     if (_mode == GameMode.relaxed) {
-      widget.app.submitScore(_game.score, mode: _mode);
       if (_game.over) {
         _game.clearBoard();
         setState(() {
@@ -339,8 +345,8 @@ class _GameScreenState extends State<GameScreen>
 
   void _finish() {
     final app = widget.app;
-    _previousBest = app.bestFor(_mode);
-    _newBest = _game.score > _previousBest;
+    _previousBest = _bestBefore;
+    _newBest = _game.score > _bestBefore;
     app.submitScore(_game.score, mode: _mode);
     _announce(app.recordGameOver(_game.score));
     app.storage.clearGame();
@@ -383,6 +389,7 @@ class _GameScreenState extends State<GameScreen>
     _clearHint();
     setState(() {
       _game = _newGame();
+      _bestBefore = widget.app.bestFor(_mode);
       _moveId++;
       _placed = const [];
       _cleared = const [];
@@ -889,11 +896,13 @@ class _GameScreenState extends State<GameScreen>
       left: topLeft.dx,
       top: topLeft.dy,
       child: IgnorePointer(
-        child: PieceView(
-          shape: piece.shape,
-          color: kBlockColors[piece.color],
-          cell: g.cell,
-          bomb: piece.bomb,
+        child: RepaintBoundary(
+          child: PieceView(
+            shape: piece.shape,
+            color: kBlockColors[piece.color],
+            cell: g.cell,
+            bomb: piece.bomb,
+          ),
         ),
       ),
     );
