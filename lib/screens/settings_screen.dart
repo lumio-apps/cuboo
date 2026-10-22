@@ -208,6 +208,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
+                        Text(
+                          app.storage.saveFailed
+                              ? 'Saving is not available on this phone right now.'
+                              : 'Saved on this phone. Opened ${app.launches} '
+                                  '${app.launches == 1 ? 'time' : 'times'}.',
+                          style: TextStyle(color: c.muted, fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
                         SelectableText(
                           'github.com/$kGithubOwner/$kGithubRepo',
                           style: TextStyle(

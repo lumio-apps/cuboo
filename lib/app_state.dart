@@ -15,6 +15,7 @@ class AppState extends ChangeNotifier {
       : _themeMode = _parseTheme(storage.themeName),
         _sound = storage.sound,
         _haptics = storage.haptics,
+        launches = storage.launches + 1,
         _best = storage.best,
         _bestRelaxed = storage.bestRelaxed,
         _bestTimed = storage.bestTimed,
@@ -28,9 +29,13 @@ class AppState extends ChangeNotifier {
         _unlocked = _parseIds(storage.achievementsRaw) {
     BlockLook.paletteIndex = _paletteIndex;
     BlockLook.style = _blockStyle;
+    storage.setLaunches(launches);
   }
 
   final GameStorage storage;
+
+  /// How many times the app has been opened, including this time.
+  final int launches;
   final SoundPlayer _player = SoundPlayer();
 
   ThemeMode _themeMode;

@@ -41,6 +41,7 @@ class GameStorage {
   static const String _kStats = 'cuboo.stats';
   static const String _kHistory = 'cuboo.history';
   static const String _kAchievements = 'cuboo.achievements';
+  static const String _kLaunches = 'cuboo.launches';
 
   T _get<T extends Object>(String key, T fallback) {
     try {
@@ -104,6 +105,10 @@ class GameStorage {
 
   Future<bool> saveGame(String json) => _set(_kGame, json);
   Future<bool> clearGame() => _remove(_kGame);
+
+  /// How many times the app was opened (used to check that saving works).
+  int get launches => _get<int>(_kLaunches, 0);
+  Future<bool> setLaunches(int value) => _set(_kLaunches, value);
 
   int get palette => _get<int>(_kPalette, 0);
   Future<bool> setPalette(int value) => _set(_kPalette, value);
