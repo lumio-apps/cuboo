@@ -60,7 +60,7 @@ Every mode keeps its own best score.
 
 **Gameplay**
 
-- **Hints** show the move that clears the most lines
+- **Hints** show the move that clears the most lines (3 per game)
 - **Bombs** show up now and then and blow up the 3x3 area around them
 - **Undo** takes back your last move (once per game)
 - **Left-handed mode** mirrors the top bar and the pieces
@@ -92,6 +92,8 @@ After that, **Settings → Check for updates** finds new versions for you. Updat
 
 - No ads, no analytics, no accounts, no trackers.
 - Scores, stats, achievements, settings and the game in progress are stored **only on your phone**. They survive closing the app and updating it. They are removed only if you uninstall Cuboo or clear its data.
+- The best score is saved after every move, so it is kept even if you leave in the middle of a game.
+- If the phone ever refuses to open its normal app storage, Cuboo saves into a small file in its own private folder instead, and moves that data back later.
 - The only network request is when you tap **Check for updates**: Cuboo asks the GitHub API for the newest release and, if you agree, downloads the APK from GitHub Releases. Nothing about you or your phone is sent.
 - Sounds are bundled in the app. Nothing is downloaded while you play.
 
@@ -121,7 +123,7 @@ lib/
   screens/     Home, Game, Stats and Settings screens
   widgets/     Logo, board, pieces, buttons, game over card
   app_state.dart   Settings, scores, stats and achievements
-  storage.dart     Everything saved on the phone (SharedPreferences)
+  storage.dart     Everything saved on the phone (SharedPreferences, with a file backup)
   stats.dart       Stats and achievements
   sound.dart       Sound effects
   theme.dart       Colours, block palettes and block styles
@@ -139,6 +141,18 @@ The game rules in `lib/game/` have no Flutter dependency, so they are easy to te
 Pushing a version tag such as `v1.0.0` starts the **Release** workflow. It builds the APK, signs it with the key stored in the repository secrets and publishes it on GitHub Releases. Pushes to `main` run the **CI** workflow (`flutter analyze` and `flutter test`).
 
 Required repository secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
+
+## Changelog
+
+| Version | What changed |
+| --- | --- |
+| **1.3.5** | Fixes saving on release builds by updating `shared_preferences_android` to 2.5.2 (an R8 crash in 2.5.0 and 2.5.1). Data saved in the backup file is moved back automatically. |
+| **1.3.4** | Saves into a private file when the phone's preferences cannot be opened. |
+| **1.3.1 to 1.3.3** | Smoother board drawing, sounds are loaded in advance, the best score is saved after every move, and a clear warning when saving is not possible. |
+| **1.3.0** | Sound effects, turning pieces in Relaxed mode (tap a piece), bomb blocks. |
+| **1.2.0** | Game modes (Classic, Relaxed, Timed, Daily Challenge), hints, copy score, sparks and screen shake. |
+| **1.1.0** | Stats, achievements, last 10 scores, block colours and styles, left-handed mode. |
+| **1.0.0** | First release. |
 
 ## Contributing
 
