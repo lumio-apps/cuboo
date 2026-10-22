@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cuboo/app_state.dart';
 import 'package:cuboo/game/mode.dart';
 import 'package:cuboo/storage.dart';
@@ -44,5 +46,38 @@ void main() {
     await settle();
     final third = await openApp();
     expect(third.launches, 3);
+  });
+
+  test('the file backup keeps data between restarts', () async {
+    final dir = Directory.systemTemp.createTempSync('cuboo_test');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final file = File('${dir.path}/cuboo_data.json');
+
+    final first = await GameStorage.openFile(file, problem: 'test');
+    expect(first.saveFailed, isFalse);
+    expect(first.problem, 'test');
+    final app = AppState(first);
+    app.submitScore(900);
+    app.recordMove(lines: 1, combo: 1, score: 900);
+    app.recordGameOver(900);
+    await first.flush();
+
+    final second = await GameStorage.openFile(file);
+    final again = AppState(second);
+    expect(again.best, 900);
+    expect(again.history, [900]);
+    expect(again.stats.totalLines, 1);
+    expect(again.unlocked, contains('first_clear'));
+    expect(again.launches, 2);
+  });
+
+  test('a broken backup file is treated as empty', () async {
+    final dir = Directory.systemTemp.createTempSync('cuboo_test');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final file = File('${dir.path}/cuboo_data.json');
+    file.writeAsStringSync('{ not json');
+    final storage = await GameStorage.openFile(file);
+    expect(storage.best, 0);
+    expect(AppState(storage).launches, 1);
   });
 }

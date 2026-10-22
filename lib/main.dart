@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
@@ -52,21 +55,54 @@ class _BootstrapState extends State<_Bootstrap> {
     // Wait patiently for the phone's storage. Starting without it would mean
     // that nothing is saved, so it is only a last resort.
     GameStorage? storage;
+    Object? error;
     for (var attempt = 0; attempt < 3 && storage == null; attempt++) {
       try {
         final prefs = await SharedPreferences.getInstance()
             .timeout(const Duration(seconds: 10));
         storage = GameStorage(prefs);
-      } catch (_) {
+      } catch (e) {
+        error = e;
         await Future<void>.delayed(const Duration(milliseconds: 400));
       }
     }
-    // The game still works without saving.
-    storage ??= GameStorage.unavailable();
+    // If the phone will not open its preferences, save into a file instead.
+    storage ??= await _openBackup(error);
     if (!mounted) return;
     final app = AppState(storage);
     setState(() => _app = app);
     app.warmUpSound();
+  }
+
+  Future<GameStorage> _openBackup(Object? error) async {
+    var problem = (error ?? 'unknown').toString().replaceAll('\n', ' ');
+    if (problem.length > 160) problem = problem.substring(0, 160);
+    final folders = <Directory>[];
+    try {
+      folders.add(await getApplicationSupportDirectory());
+    } catch (_) {
+      // Try the next folder.
+    }
+    try {
+      final temp = Directory.systemTemp;
+      if (temp.path.contains('cuboo')) {
+        folders.add(Directory('${temp.parent.path}/files'));
+      }
+    } catch (_) {
+      // Nothing more to try.
+    }
+    for (final folder in folders) {
+      try {
+        await folder.create(recursive: true);
+        final file = File('${folder.path}/cuboo_data.json');
+        if (!await file.exists()) await file.writeAsString('{}', flush: true);
+        return await GameStorage.openFile(file, problem: problem);
+      } catch (_) {
+        // Try the next folder.
+      }
+    }
+    // The game still works without saving.
+    return GameStorage.unavailable(problem: problem);
   }
 
   @override

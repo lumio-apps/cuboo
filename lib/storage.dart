@@ -1,31 +1,92 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Everything Cuboo saves lives on the phone, in SharedPreferences.
+/// Everything Cuboo saves lives on the phone. Normally that is
+/// SharedPreferences. If the phone refuses to open it, a small JSON file in
+/// the app's private folder is used instead (see [openFile]).
 ///
 /// The keys below must never change between versions, otherwise an update
 /// would lose the player's scores and settings.
 class GameStorage {
   GameStorage(SharedPreferences prefs)
       : _prefs = prefs,
+        _file = null,
+        problem = null,
         saveFailed = false;
 
-  /// Used when the phone storage cannot be opened (and in tests). Nothing is
-  /// saved, but the game still works.
+  /// Nothing is saved, but the game works. Used in tests.
   GameStorage.inMemory()
       : _prefs = null,
+        _file = null,
+        problem = null,
         saveFailed = false;
 
-  /// Like [inMemory], but for when the phone storage could not be opened.
-  /// The home screen tells the player that nothing will be kept.
-  GameStorage.unavailable()
+  /// Like [inMemory], but for when no storage could be opened at all. The
+  /// home screen tells the player that nothing will be kept.
+  GameStorage.unavailable({this.problem})
       : _prefs = null,
+        _file = null,
         saveFailed = true;
 
-  final SharedPreferences? _prefs;
+  GameStorage._withFile(File file, Map<String, Object> data, this.problem)
+      : _prefs = null,
+        _file = file,
+        saveFailed = false {
+    _memory.addAll(data);
+  }
 
-  /// True when the phone storage could not be opened.
+  /// Saves into a JSON [file] (created when missing). A broken or unreadable
+  /// file just means empty data. [problem] says why SharedPreferences was not
+  /// used, so Settings can show it.
+  static Future<GameStorage> openFile(File file, {String? problem}) async {
+    final data = <String, Object>{};
+    try {
+      if (await file.exists()) {
+        final decoded = jsonDecode(await file.readAsString());
+        if (decoded is Map<String, dynamic>) {
+          for (final entry in decoded.entries) {
+            final value = entry.value;
+            if (value is int || value is bool || value is String) {
+              data[entry.key] = value as Object;
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Unreadable data is treated as empty.
+    }
+    return GameStorage._withFile(file, data, problem);
+  }
+
+  final SharedPreferences? _prefs;
+  final File? _file;
+
+  /// Why SharedPreferences could not be used (null when it works).
+  final String? problem;
+
+  /// True when no storage could be opened, so nothing is kept.
   final bool saveFailed;
   final Map<String, Object> _memory = {};
+  Future<void> _lastWrite = Future<void>.value();
+
+  void _persist() {
+    final file = _file;
+    if (file == null) return;
+    final text = jsonEncode(_memory);
+    _lastWrite = _lastWrite.then((_) async {
+      try {
+        await file.writeAsString(text, flush: true);
+      } catch (_) {
+        // Saving is best effort.
+      }
+    });
+  }
+
+  /// Completes when everything written so far has reached the file.
+  Future<void> flush() => _lastWrite;
 
   static const String _kBest = 'cuboo.best';
   static const String _kTheme = 'cuboo.theme';
@@ -59,6 +120,7 @@ class GameStorage {
     final prefs = _prefs;
     if (prefs == null) {
       _memory[key] = value;
+      _persist();
       return true;
     }
     try {
@@ -75,6 +137,7 @@ class GameStorage {
     final prefs = _prefs;
     if (prefs == null) {
       _memory.remove(key);
+      _persist();
       return true;
     }
     try {

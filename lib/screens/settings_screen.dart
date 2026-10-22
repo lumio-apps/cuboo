@@ -215,6 +215,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   '${app.launches == 1 ? 'time' : 'times'}.',
                           style: TextStyle(color: c.muted, fontSize: 14),
                         ),
+                        if (app.storage.problem != null) ...[
+                          const SizedBox(height: 6),
+                          SelectableText(
+                            'Details: ${app.storage.problem}',
+                            style: TextStyle(color: c.muted, fontSize: 12),
+                          ),
+                        ],
                         const SizedBox(height: 8),
                         SelectableText(
                           'github.com/$kGithubOwner/$kGithubRepo',
